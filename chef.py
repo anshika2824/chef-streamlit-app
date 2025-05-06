@@ -147,3 +147,13 @@ if generate_t2t and prompt:
                 logging.info(response)
         with first_tab2:
             st.text(prompt)
+
+# import google.cloud.logging
+# from google.cloud import logging as cloud_logging
+
+try:
+    from google.cloud import logging as cloud_logging
+    log_client = cloud_logging.Client()
+    log_client.setup_logging()
+except:
+    print("Google Cloud Logging not set up (non-GCP environment).")
