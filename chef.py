@@ -2,13 +2,17 @@ import os
 import streamlit as st
 import logging
 
-# Try to import and set up Google Cloud Logging (optional)
+# configure basic console logging
+logging.basicConfig(level=logging.INFO)
+
+# optional: set up Google Cloud Logging only if available
 try:
     from google.cloud import logging as cloud_logging
     log_client = cloud_logging.Client()
     log_client.setup_logging()
 except Exception as e:
-    print("Google Cloud Logging not set up. Skipping...")
+    logging.warning("Google Cloud Logging not available. Running with console logging only.")
+
 
 import vertexai
 from vertexai.preview.generative_models import (
