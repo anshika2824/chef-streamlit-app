@@ -1,7 +1,15 @@
 import os
 import streamlit as st
 import logging
-from google.cloud import logging as cloud_logging
+
+# Try to import and set up Google Cloud Logging (optional)
+try:
+    from google.cloud import logging as cloud_logging
+    log_client = cloud_logging.Client()
+    log_client.setup_logging()
+except Exception as e:
+    print("Google Cloud Logging not set up. Skipping...")
+
 import vertexai
 from vertexai.preview.generative_models import (
     GenerationConfig,
@@ -14,11 +22,10 @@ from datetime import (
     date,
     timedelta,
 )
-# configure logging
+
+# configure basic logging (to console)
 logging.basicConfig(level=logging.INFO)
-# attach a Cloud Logging handler to the root logger
-log_client = cloud_logging.Client()
-log_client.setup_logging()
+
 
 PROJECT_ID = os.environ.get("qwiklabs-gcp-04-15b6f6c45a82")  # Your Google Cloud Project ID
 LOCATION = os.environ.get("europe-west1")  # Your Google Cloud Project Region
