@@ -1,47 +1,46 @@
 import os
+import json
 import streamlit as st
 import logging
 
-# configure basic console logging
+# Configure console logging
 logging.basicConfig(level=logging.INFO)
 
-# optional: set up Google Cloud Logging only if available
-try:
-    from google.cloud import logging as cloud_logging
-    log_client = cloud_logging.Client()
-    log_client.setup_logging()
-except Exception as e:
-    logging.warning("Google Cloud Logging not available. Running with console logging only.")
+# --- AUTH SETUP WITH GCP SECRETS ---
+# Write service account JSON key to a temp file
+creds = st.secrets["GCP_SERVICE_ACCOUNT"]
+key_path = "/tmp/gcp_key.json"
+with open(key_path, "w") as f:
+    f.write(creds)
 
+# Set environment variable for Google SDKs
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
 
+# Read project ID and region
+PROJECT_ID = st.secrets["PROJECT_ID"]
+LOCATION = st.secrets.get("LOCATION", "us-central1")
+
+# --- IMPORT VERTEX AI ---
 import vertexai
+from vertexai import init
 from vertexai.preview.generative_models import (
     GenerationConfig,
     GenerativeModel,
     HarmBlockThreshold,
-    HarmCategory,
-    Part,
-)
-from datetime import (
-    date,
-    timedelta,
+    HarmCategory
 )
 
-# configure basic logging (to console)
-logging.basicConfig(level=logging.INFO)
+# Initialize Vertex AI
+init(project=PROJECT_ID, location=LOCATION)
 
-
-PROJECT_ID = os.environ.get("qwiklabs-gcp-04-15b6f6c45a82")  # Your Google Cloud Project ID
-LOCATION = os.environ.get("europe-west1")  # Your Google Cloud Project Region
-vertexai.init(project=PROJECT_ID, location=LOCATION)
-
-
+# --- MODEL LOADING ---
 @st.cache_resource
 def load_models():
-    text_model_flash = GenerativeModel("gemini-2.0-flash-001")
-    return text_model_flash
+    return GenerativeModel("gemini-2.0-flash-001")
 
+text_model_flash = load_models()
 
+# --- FUNCTION TO GET RESPONSE ---
 def get_gemini_flash_text_response(
     model: GenerativeModel,
     contents: str,
@@ -56,28 +55,23 @@ def get_gemini_flash_text_response(
     }
 
     responses = model.generate_content(
-        prompt,
+        contents,
         generation_config=generation_config,
         safety_settings=safety_settings,
         stream=stream,
     )
 
-    final_response = []
-    for response in responses:
-        try:
-            # st.write(response.text)
-            final_response.append(response.text)
-        except IndexError:
-            # st.write(response)
-            final_response.append("")
-            continue
-    return " ".join(final_response)
+    result = []
+    for r in responses:
+        result.append(getattr(r, "text", ""))
+    return " ".join(result)
 
-st.header("Vertex AI Gemini API", divider="gray")
-text_model_flash = load_models()
+# --- STREAMLIT UI ---
+st.header("👨‍🍳 AI Chef Powered by Gemini Flash", divider="gray")
 
-st.write("Using Gemini Flash - Text only model")
-st.subheader("AI Chef")
+st.write("Using Gemini Flash - Text-only model")
+
+st.subheader("Tell us your preferences:")
 
 cuisine = st.selectbox(
     "What cuisine do you desire?",
@@ -88,83 +82,44 @@ cuisine = st.selectbox(
 
 dietary_preference = st.selectbox(
     "Do you have any dietary preferences?",
-    ("Diabetese", "Glueten free", "Halal", "Keto", "Kosher", "Lactose Intolerance", "Paleo", "Vegan", "Vegetarian", "None"),
+    ("Diabetes", "Gluten free", "Halal", "Keto", "Kosher", "Lactose Intolerance", "Paleo", "Vegan", "Vegetarian", "None"),
     index=None,
-    placeholder="Select your desired dietary preference."
+    placeholder="Select your dietary preference."
 )
 
-allergy = st.text_input(
-    "Enter your food allergy:  \n\n", key="allergy", value="peanuts"
-)
-
-ingredient_1 = st.text_input(
-    "Enter your first ingredient:  \n\n", key="ingredient_1", value="ahi tuna"
-)
-
-ingredient_2 = st.text_input(
-    "Enter your second ingredient:  \n\n", key="ingredient_2", value="chicken breast"
-)
-
-ingredient_3 = st.text_input(
-    "Enter your third ingredient:  \n\n", key="ingredient_3", value="tofu"
-)
+allergy = st.text_input("Enter any food allergy:", value="peanuts")
+ingredient_1 = st.text_input("Enter your first ingredient:", value="ahi tuna")
+ingredient_2 = st.text_input("Enter your second ingredient:", value="chicken breast")
+ingredient_3 = st.text_input("Enter your third ingredient:", value="tofu")
 wine = st.radio("Select wine preference:", ["Red", "White", "None"])
 
-# Task 2.5
-# Complete Streamlit framework code for the user interface, add the wine preference radio button to the interface.
-# https://docs.streamlit.io/library/api-reference/widgets/st.radio
+# --- PROMPT GENERATION ---
+prompt = f"""
+I am a Chef. I need to create {cuisine} recipes for customers who want {dietary_preference} meals.
+Do not include any ingredients that may trigger their {allergy} allergy.
+I have {ingredient_1}, {ingredient_2}, and {ingredient_3} in my kitchen along with other ingredients.
+The customer's wine preference is {wine}.
+Please provide meal recommendations.
 
-
-max_output_tokens = 2048
-
-# Task 2.6
-# Modify this prompt with the custom chef prompt.
-prompt = f"""I am a Chef.  I need to create {cuisine} \n
-recipes for customers who want {dietary_preference} meals. \n
-However, don't include recipes that use ingredients with the customer's {allergy} allergy. \n
-I have {ingredient_1}, \n
-{ingredient_2}, \n
-and {ingredient_3} \n
-in my kitchen and other ingredients. \n
-The customer's wine preference is {wine} \n
-Please provide some for meal recommendations.
-For each recommendation include preparation instructions,
-time to prepare
-and the recipe title at the beginning of the response.
-Then include the wine paring for each recommendation.
-At the end of the recommendation provide the calories associated with the meal
-and the nutritional facts.
+For each recommendation include:
+- A title
+- Preparation instructions
+- Time to prepare
+- Wine pairing
+- Calories and nutritional facts
 """
 
-config = {
-    "temperature": 0.8,
-    "max_output_tokens": 2048,
-}
+# --- GENERATION CONFIG ---
+config = GenerationConfig(temperature=0.8, max_output_tokens=2048)
 
-generate_t2t = st.button("Generate my recipes.", key="generate_t2t")
-if generate_t2t and prompt:
-    # st.write(prompt)
-    with st.spinner("Generating your recipes using Gemini..."):
-        first_tab1, first_tab2 = st.tabs(["Recipes", "Prompt"])
-        with first_tab1:
-            response = get_gemini_flash_text_response(
-                text_model_flash,
-                prompt,
-                generation_config=config,
-            )
-            if response:
-                st.write("Your recipes:")
-                st.write(response)
-                logging.info(response)
-        with first_tab2:
-            st.text(prompt)
-
-# import google.cloud.logging
-# from google.cloud import logging as cloud_logging
-
-try:
-    from google.cloud import logging as cloud_logging
-    log_client = cloud_logging.Client()
-    log_client.setup_logging()
-except:
-    print("Google Cloud Logging not set up (non-GCP environment).")
+# --- GENERATE BUTTON ---
+if st.button("🍽️ Generate My Recipes"):
+    with st.spinner("Cooking up something delicious..."):
+        try:
+            result = get_gemini_flash_text_response(text_model_flash, prompt, config)
+            st.subheader("Here’s your custom meal plan:")
+            st.write(result)
+            logging.info(result)
+        except Exception as e:
+            st.error("Oops! Something went wrong.")
+            st.exception(e)
