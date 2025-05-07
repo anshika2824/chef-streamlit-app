@@ -14,7 +14,12 @@ with open(key_path, "w") as f:
     f.write(creds)
 
 # Set environment variable for Google SDKs
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
+import os
+from google.cloud import vertexai
+
+# Set up environment variable (you can also rely on it being set outside the script)
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/anshikarana/Downloads/chef-streamlet-deaaa1ac020a.json"
+
 
 # Read project ID and region
 PROJECT_ID = st.secrets["PROJECT_ID"]
