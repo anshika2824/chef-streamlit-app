@@ -1,73 +1,53 @@
 import openai
 import streamlit as st
-import logging
 
-# Set OpenAI API key
-openai.api_key = st.secrets["OPENAI_API_KEY"]  # Ensure your API key is in your secrets
+# Set your OpenAI API key (use your own API key here)
+openai.api_key = st.secrets["openai_api_key"]
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Define the project and location (used for your setup)
+PROJECT_ID = st.secrets["PROJECT_ID"]
+LOCATION = st.secrets["LOCATION"]
 
-# --- STREAMLIT UI ---
-st.header("👨‍🍳 AI Chef Powered by GPT-3")
+# Define the model you want to use
+model_name = "gpt-4"  # You can choose any other model like "gpt-3.5-turbo"
 
-st.write("Using GPT-3 to generate custom meal plans!")
+def get_gemini_flash_text_response(prompt: str):
+    """
+    Function to get the response from the OpenAI GPT model using chat completion API.
+    """
+    try:
+        # Prepare the conversation messages
+        messages = [
+            {"role": "system", "content": "You are a helpful chef."},  # System message for behavior
+            {"role": "user", "content": prompt}  # User prompt
+        ]
+        
+        # Call the OpenAI API with the new chat completion method
+        response = openai.chat.Completion.create(
+            model=model_name,  # Specify the model
+            messages=messages   # Send the messages as input
+        )
+        
+        # Extract the content from the response
+        result = response['choices'][0]['message']['content']
+        return result
+    
+    except Exception as e:
+        # Handle any errors that occur during the request
+        st.error(f"Error: {e}")
+        return None
 
-st.subheader("Tell us your preferences:")
+# Streamlit interface
+st.title("Chef Assistant")
 
-cuisine = st.selectbox(
-    "What cuisine do you desire?",
-    ("American", "Chinese", "French", "Indian", "Italian", "Japanese", "Mexican", "Turkish"),
-    index=None,
-    placeholder="Select your desired cuisine."
-)
+# User input for the recipe or query
+prompt = st.text_input("What do you want to cook today?")
 
-dietary_preference = st.selectbox(
-    "Do you have any dietary preferences?",
-    ("Diabetes", "Gluten free", "Halal", "Keto", "Kosher", "Lactose Intolerance", "Paleo", "Vegan", "Vegetarian", "None"),
-    index=None,
-    placeholder="Select your dietary preference."
-)
-
-allergy = st.text_input("Enter any food allergy:", value="peanuts")
-ingredient_1 = st.text_input("Enter your first ingredient:", value="ahi tuna")
-ingredient_2 = st.text_input("Enter your second ingredient:", value="chicken breast")
-ingredient_3 = st.text_input("Enter your third ingredient:", value="tofu")
-wine = st.radio("Select wine preference:", ["Red", "White", "None"])
-
-# --- PROMPT GENERATION ---
-prompt = f"""
-I am a Chef. I need to create {cuisine} recipes for customers who want {dietary_preference} meals.
-Do not include any ingredients that may trigger their {allergy} allergy.
-I have {ingredient_1}, {ingredient_2}, and {ingredient_3} in my kitchen along with other ingredients.
-The customer's wine preference is {wine}.
-Please provide meal recommendations.
-
-For each recommendation include:
-- A title
-- Preparation instructions
-- Time to prepare
-- Wine pairing
-- Calories and nutritional facts
-"""
-
-# --- GENERATE BUTTON ---
-if st.button("🍽️ Generate My Recipes"):
-    with st.spinner("Cooking up something delicious..."):
-        try:
-            # Make API call to OpenAI GPT-3
-            response = openai.Completion.create(
-                engine="text-davinci-003",  # Use the Davinci model (GPT-3)
-                prompt=prompt,
-                temperature=0.7,
-                max_tokens=1500,
-            )
-
-            # Display the result
-            result = response.choices[0].text.strip()
-            st.subheader("Here’s your custom meal plan:")
-            st.write(result)
-            logging.info(result)
-        except Exception as e:
-            st.error("Oops! Something went wrong.")
-            st.exception(e)
+if prompt:
+    # Get the result from the model
+    result = get_gemini_flash_text_response(prompt)
+    
+    if result:
+        # Display the result to the user
+        st.write("Here's your recipe:")
+        st.write(result)
