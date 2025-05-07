@@ -10,17 +10,15 @@ logging.basicConfig(level=logging.INFO)
 
 # --- AUTH SETUP WITH GCP SECRETS ---
 # Write service account JSON key to a temp file
+# --- AUTH SETUP WITH GCP SECRETS ---
 creds = st.secrets["GCP_SERVICE_ACCOUNT"]
 key_path = "/tmp/gcp_key.json"
 with open(key_path, "w") as f:
     f.write(creds)
 
 # Set environment variable for Google SDKs
-import os
-from google.cloud import vertexai
-
-# Set up environment variable (you can also rely on it being set outside the script)
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
+
 
 
 
