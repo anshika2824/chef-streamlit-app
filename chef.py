@@ -2,6 +2,8 @@ import os
 import json
 import streamlit as st
 import logging
+pip install google-cloud-aiplatform
+
 
 # Configure console logging
 logging.basicConfig(level=logging.INFO)
