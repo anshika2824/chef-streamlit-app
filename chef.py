@@ -1,81 +1,17 @@
-import os
-import json
+import openai
 import streamlit as st
 import logging
 
+# Set OpenAI API key
+openai.api_key = st.secrets["OPENAI_API_KEY"]  # Ensure your API key is in your secrets
 
-
-# Configure console logging
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 
-# --- AUTH SETUP WITH GCP SECRETS ---
-# Write service account JSON key to a temp file
-# --- AUTH SETUP WITH GCP SECRETS ---
-creds = st.secrets["GCP_SERVICE_ACCOUNT"]
-key_path = "/tmp/gcp_key.json"
-with open(key_path, "w") as f:
-    f.write(creds)
-
-# Set environment variable for Google SDKs
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
-
-
-
-
-# Read project ID and region
-PROJECT_ID = st.secrets["PROJECT_ID"]
-LOCATION = st.secrets.get("LOCATION", "us-central1")
-
-# --- IMPORT VERTEX AI ---
-import vertexai
-from vertexai import init
-from vertexai.preview.generative_models import (
-    GenerationConfig,
-    GenerativeModel,
-    HarmBlockThreshold,
-    HarmCategory
-)
-
-# Initialize Vertex AI
-init(project=PROJECT_ID, location=LOCATION)
-
-# --- MODEL LOADING ---
-@st.cache_resource
-def load_models():
-    return GenerativeModel("gemini-2.0-flash-001")
-
-text_model_flash = load_models()
-
-# --- FUNCTION TO GET RESPONSE ---
-def get_gemini_flash_text_response(
-    model: GenerativeModel,
-    contents: str,
-    generation_config: GenerationConfig,
-    stream: bool = True,
-):
-    safety_settings = {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-    }
-
-    responses = model.generate_content(
-        contents,
-        generation_config=generation_config,
-        safety_settings=safety_settings,
-        stream=stream,
-    )
-
-    result = []
-    for r in responses:
-        result.append(getattr(r, "text", ""))
-    return " ".join(result)
-
 # --- STREAMLIT UI ---
-st.header("👨‍🍳 AI Chef Powered by Gemini Flash", divider="gray")
+st.header("👨‍🍳 AI Chef Powered by GPT-3")
 
-st.write("Using Gemini Flash - Text-only model")
+st.write("Using GPT-3 to generate custom meal plans!")
 
 st.subheader("Tell us your preferences:")
 
@@ -115,14 +51,20 @@ For each recommendation include:
 - Calories and nutritional facts
 """
 
-# --- GENERATION CONFIG ---
-config = GenerationConfig(temperature=0.8, max_output_tokens=2048)
-
 # --- GENERATE BUTTON ---
 if st.button("🍽️ Generate My Recipes"):
     with st.spinner("Cooking up something delicious..."):
         try:
-            result = get_gemini_flash_text_response(text_model_flash, prompt, config)
+            # Make API call to OpenAI GPT-3
+            response = openai.Completion.create(
+                engine="text-davinci-003",  # Use the Davinci model (GPT-3)
+                prompt=prompt,
+                temperature=0.7,
+                max_tokens=1500,
+            )
+
+            # Display the result
+            result = response.choices[0].text.strip()
             st.subheader("Here’s your custom meal plan:")
             st.write(result)
             logging.info(result)
